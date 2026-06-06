@@ -6,6 +6,9 @@ from datasets.activations import ActivationsDataset
 import torch
 from pathlib import Path
 import argparse
+import numpy as np
+import random
+
 
 def get_args_parser():
     parser = argparse.ArgumentParser("Train Sparse Autoencoder", add_help=False)
