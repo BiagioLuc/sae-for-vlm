@@ -20,6 +20,7 @@ def get_args_parser():
     parser.add_argument("--steps", type=int, default=10_000)
     parser.add_argument("--save_steps", type=int, default=1_000)
     parser.add_argument("--log_steps", type=int, default=50)
+    parser.add_argument("--seed", type=int, default=None)
     # JumpRelu
     parser.add_argument("--bandwidth", type=float, default=0.001)
     parser.add_argument("--sparsity_penalty", type=float, default=0.1)
@@ -40,6 +41,14 @@ def get_args_parser():
     return parser
 
 def train_sae(args):
+    if args.seed is not None:
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+        torch.manual_seed(args.seed)
+        torch.cuda.manual_seed_all(args.seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        print(f"✓ Seed globale impostato a: {args.seed}")
     dataset = ActivationsDataset(args.activations_dir, device=torch.device(args.device))
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
@@ -78,7 +87,9 @@ def train_sae(args):
         "lm_name": "",
         "submodule_name": ""
     }
-
+    
+    if args.seed is not None:
+        trainer_cfg["seed"] = args.seed
     if args.sae_model == "jumprelu":
         trainer_cfg["bandwidth"] = args.bandwidth
         trainer_cfg["sparsity_penalty"] = args.sparsity_penalty
