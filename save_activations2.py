@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from pathlib import Path
 
 from datasets.activations import ActivationsDataset
-from dictionary_learning.trainers.top_k import TopKSAE
+from dictionary_learning.trainers.top_k import AutoEncoderTopK
 
 def get_args_parser():
     parser = argparse.ArgumentParser(description="Activations extraction")
@@ -17,8 +17,7 @@ def get_args_parser():
                         help="final activations ")
     parser.add_argument("--k", type=int, default=32)
     parser.add_argument("--batch_size", type=int, default=4096)
-    parser.add_argument("--expansion_factor", type=int, default=1)
-    parser.add_argument("--activation_dimension", type=int, default=512)
+    
 
     return parser
 
@@ -31,15 +30,9 @@ def main(args):
     vpr_dataset = ActivationsDataset(args.vpr_descriptors_dir, device=device)
     vpr_dataloader = DataLoader(vpr_dataset, batch_size=args.batch_size, shuffle=False)
     
-    primo_elemento = vpr_dataset[0]
-    
-    input_dim = args.activation_dimension
+    sae = AutoEncoderTopK.from_pretrained(args.sae_checkpoint, k=args.k, device=device)
+    sae.eval()
 
-    d_s = input_dim * args.expansion_factor
-
-    print(f"Inizializzazione e caricamento pesi del TopKSAE (K={args.k}) da: {args.sae_checkpoint}")
-    
-    sae = TopKSAE(activation_dim=input_dim, dict_size=d_s, k=args.k).to(device)
     
   
     state_dict = torch.load(args.sae_checkpoint, map_location=device)
