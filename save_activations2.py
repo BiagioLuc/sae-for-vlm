@@ -34,9 +34,9 @@ def main(args):
     vpr_dataset = ActivationsDataset(args.vpr_descriptors_dir, device=device)
     vpr_dataloader = DataLoader(vpr_dataset, batch_size=args.batch_size, shuffle=False)
 
-    #Instead of instantiating a base vision model (like CLIP) 
-    # and hooking/attaching the SAE to an internal layer, we load the SAE as a 
-    # standalone model to encode the pre-computed activations directly.
+    # We no longer load the big vision model (like CLIP).
+    # Since we already have the features ready, we just load the SAE by itself 
+    # as a standalone model to process our data directly.
     
     sae = AutoEncoderTopK.from_pretrained(args.sae_checkpoint, k=args.k, device=device)
     sae.eval()
