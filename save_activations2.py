@@ -28,7 +28,7 @@ def main(args):
     
     #Instead of loading an image dataset (e.g., ImageFolder) 
     # and using a vision processor, we now directly load the pre-computed 
-    # base model activations (descriptors) using a dedicated ActivationsDataset.
+    # base model activations (descriptors) using the dataset GSV.
     
     print(f"Loading descriptors from: {args.vpr_descriptors_dir}")
     vpr_dataset = ActivationsDataset(args.vpr_descriptors_dir, device=device)
@@ -54,8 +54,7 @@ def main(args):
     for batch in vpr_dataloader:
         batch = batch.to(device)
         
-    #We no longer call `model.encode(image)` to capture 
-        # hooks. We feed the raw activations batch directly into the SAE encoder.
+    
         sparse_acts = sae.encode(batch)
 
         # Move tensors to CPU to conserve GPU memory and avoid Out-Of-Memory (OOM) crashes
