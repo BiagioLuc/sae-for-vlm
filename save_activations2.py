@@ -25,7 +25,9 @@ def get_args_parser():
 def main(args):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Utilizzo il dispositivo: {device}")
-
+    #Instead of loading an image dataset (e.g., ImageFolder) 
+    # and using a vision processor, we now directly load the pre-computed 
+    # base model activations (descriptors) using a dedicated ActivationsDataset.
     print(f"Caricamento dei descrittori da: {args.vpr_descriptors_dir}")
     vpr_dataset = ActivationsDataset(args.vpr_descriptors_dir, device=device)
     vpr_dataloader = DataLoader(vpr_dataset, batch_size=args.batch_size, shuffle=False)
