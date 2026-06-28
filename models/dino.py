@@ -8,6 +8,6 @@ class Dino:
         self.processor = AutoImageProcessor.from_pretrained(f"facebook/{model_name}")
 
     def encode(self, inputs):
-        outputs = self.model(**inputs.to(self.device))
+        outputs = self.model(pixel_values=inputs.to(self.device))
         image_embeds = outputs.pooler_output
         return image_embeds
