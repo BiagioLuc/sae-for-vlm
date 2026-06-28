@@ -17,26 +17,26 @@ def get_args_parser():
     return parser
 
 def main(args):
-    # Configurazione del device (usa CUDA se specificato e disponibile)
+    # Device configuration (fallback to CPU if CUDA is requested but unavailable)
     device = torch.device(args.device if torch.cuda.is_available() and "cuda" in args.device else "cpu")
     print(f"Utilizzo del device: {device}")
 
-    # Load embeddings - CARICATI DIRETTAMENTE SUL DEVICE
+    # Load embeddings 
     embeddings = torch.load(args.embeddings_path, map_location=device)
     print(f"Loaded embeddings found at {args.embeddings_path}")
     print(f"Embeddings shape: {embeddings.shape}")
 
-    # Load activations - SPOSTATE SUL DEVICE
+    # # Load SAE latent activations and transfer them to the device
     activations_dataset = ActivationsDataset(args.activations_dir, device=device, take_every=1)
     activations_dataloader = DataLoader(activations_dataset, batch_size=len(activations_dataset), shuffle=False)
     activations = next(iter(activations_dataloader)).to(device)
     print(f"Loaded activations found at {args.activations_dir}")
     print(f"Activations shape: {activations.shape}")
 
-    # Scale to 0-1 per neuron
+    # Normalize activations to [0, 1] range for each neuron independently
     min_values = activations.min(dim=0, keepdim=True)[0]
     max_values = activations.max(dim=0, keepdim=True)[0]
-    # Gestione minima per evitare divisioni per zero se min == max
+    # Normalize activations to [0, 1] range for each neuron independently
     denom = max_values - min_values
     denom = torch.where(denom == 0, torch.ones_like(denom), denom)
     activations = (activations - min_values) / denom
@@ -44,16 +44,16 @@ def main(args):
     num_images, embed_dim = embeddings.shape
     num_neurons = activations.shape[1]
 
-    # Pre-normalizzazione degli embeddings: TRASFORMA LA COSINE SIMILARITY IN UN SEMPLICE PRODOTTO SCALARE
-    # Questo trucco matematico rende il calcolo immensamente più veloce senza cambiare il risultato
+    # Pre-normalize embeddings to compute cosine similarity as a pure matrix-vector dot product
     embeddings = F.normalize(embeddings, p=2, dim=1)
 
-    # Inizializza gli accumulatori DIRETTAMENTE SUL DEVICE per evitare scambi di memoria
+    # Initialize accumulation tensors on the target device to avoid overhead from host-device transfers
     weighted_cosine_similarity_sum = torch.zeros(num_neurons, device=device)
     weight_sum = torch.zeros(num_neurons, device=device)
     
-    # Aumentato a 1024 (o più se la tua GPU ha molta memoria) per accelerare drasticamente il calcolo
-    batch_size = 1024  
+    # Define mini-batch size for parallelizing the pairwise similarity computation
+    batch_size = 1024 
+    # Compute weighted pairwise cosine similarities
 
     for i in tqdm.tqdm(range(num_images), desc="Processing image pairs"):
         embeddings_i = embeddings[i]  # Già sul device
@@ -64,23 +64,20 @@ def main(args):
 
             embeddings_j = embeddings[j_start:j_end]  
             activations_j = activations[j_start:j_end]  
-
-            # Calcolo super veloce: avendo pre-normalizzato gli embeddings, 
-            # la cosine similarity è semplicemente il prodotto scalare (moltiplicazione matrice-vettore)
             cosine_similarities = torch.mv(embeddings_j, embeddings_i)
 
-            # Compute weights and weighted similarities
+            # Compute the activation weight products a_i * a_j for each image pair
             weights = activations_i.unsqueeze(0) * activations_j  
             weighted_cosine_similarities = weights * cosine_similarities.unsqueeze(1)  
 
-            # Accumulo i dati direttamente sul device senza chiamare .cpu()
+            # Accumulate values directly on device to bypass CPU sync bottlenecks
             weighted_cosine_similarity_sum += torch.sum(weighted_cosine_similarities, dim=0)  
             weight_sum += torch.sum(weights, dim=0)  
 
-    # Calcolo finale sul device
+    # Compute final weighted average for active features, masking inactive (dead) neurons with NaN
     monosemanticity = torch.where(weight_sum != 0, weighted_cosine_similarity_sum / weight_sum, torch.nan)
 
-    # PORTIAMO SU CPU SOLO ALLA FINE PER IL SALVATAGGIO E LE STAMPE
+    # Transfer the final evaluation matrix back to CPU storage for logging and persistence
     monosemanticity = monosemanticity.cpu()
 
     os.makedirs(os.path.join(args.activations_dir, args.output_subdir), exist_ok=True)
