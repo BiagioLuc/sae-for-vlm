@@ -60,7 +60,7 @@ def main(args):
         # Move tensors to CPU to conserve GPU memory and avoid Out-Of-Memory (OOM) crashes
         all_sparse_activations.append(sparse_acts.cpu())
 
-    # Concatenate all processed batches into a single final matrix
+    # Concatenate all processed batches into a single final matrix of dimensions: number of images x number of neurons
     all_sparse_activations = torch.cat(all_sparse_activations, dim=0)
     print(f"→ Activation matrix generated! Shape: {all_sparse_activations.shape}")
 
